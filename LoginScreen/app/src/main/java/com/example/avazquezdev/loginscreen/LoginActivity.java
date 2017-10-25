@@ -3,6 +3,9 @@ package com.example.avazquezdev.loginscreen;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
@@ -19,6 +22,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -43,6 +47,8 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
      * Id to identity READ_CONTACTS permission request.
      */
     private static final int REQUEST_READ_CONTACTS = 0;
+    public static final String EXTRA_MESSAGE = "";
+
 
     /**
      * A dummy authentication store containing known user names and passwords.
@@ -62,10 +68,45 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     private View mProgressView;
     private View mLoginFormView;
 
+    private static final String TAG = "LoginActivity";
+
+    private KeyStoreJB keyStore;
+    private SharedPreferences pref;
+    private static final String USER = "USER";
+    private static final String PASS = "PASS";
+
+    Context context;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
+
+        context = this;
+        //We're checking to see if we have the storage credentials.
+        keyStore = new KeyStoreJB(this);
+        pref = this.getSharedPreferences("Login",this.MODE_PRIVATE);
+
+        if(keyStore.existAlias(USER)){
+            String user = decrypt(USER);
+            String pass = decrypt(PASS);
+            //TODO: remove log in a real authentication system.
+            Log.d(TAG,"User: " + user);
+            Log.d(TAG,"Pass: " + pass);
+            if(login(user,pass)){
+                Log.d(TAG,"Login success!");
+                Intent i = new Intent(this, SucessActivity.class );
+                i.putExtra(EXTRA_MESSAGE, "Sucess!!");
+                startActivity(i);
+            }
+            else {
+                Log.d(TAG, "Error: " + getString(R.string.error_incorrect_user) + " or " + getString(R.string.error_incorrect_password));
+                removeLogin();
+            }
+        }
+        else
+        Log.d(TAG,"Alias not exist");
+
         // Set up the login form.
         mEmailView = (AutoCompleteTextView) findViewById(R.id.email);
         populateAutoComplete();
@@ -321,15 +362,26 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                 return false;
             }
 
-            for (String credential : DUMMY_CREDENTIALS) {
-                String[] pieces = credential.split(":");
-                if (pieces[0].equals(mEmail)) {
-                    // Account exists, return true if the password matches.
-                    return pieces[1].equals(mPassword);
-                }
-            }
-
             // TODO: register the new account here.
+            generateKey(USER);
+            encrypt(USER,mEmail);
+            generateKey(PASS);
+            encrypt(PASS,mPassword);
+
+            String message;
+            if(login(mEmail,mPassword)){
+                Log.d(TAG,"Login success!");
+                message = "Sucess!!";
+            }
+            else
+                message = getString(R.string.error_incorrect_user) + " or " + getString(R.string.error_incorrect_password);
+
+            Intent i = new Intent(context, SucessActivity.class );
+            i.putExtra(EXTRA_MESSAGE, message);
+            startActivity(i);
+
+
+
             return true;
         }
 
@@ -351,6 +403,41 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             mAuthTask = null;
             showProgress(false);
         }
+    }
+    public boolean generateKey(String alias) {
+        boolean status = keyStore.createNewKey(alias);
+        return status;
+    }
+    public String encrypt(String alias, String password) {
+        SharedPreferences.Editor editor = pref.edit();
+        String pass_encrypt = keyStore.encryptString(alias, password);
+        editor.putString(alias, pass_encrypt);
+        editor.commit();
+
+        return pass_encrypt;
+
+    }
+    public String decrypt(String alias) {
+        String pass_encrypt_key = pref.getString(alias, null);
+        if(pass_encrypt_key == null)
+            return "Not data";
+        return keyStore.decryptString(alias, pass_encrypt_key);
+
+    }
+    public boolean removeLogin(){
+        keyStore.deleteKey(USER);
+        keyStore.deleteKey(PASS);
+        return true;
+    }
+    public boolean login(String user, String password){
+        for (String credential : DUMMY_CREDENTIALS) {
+            String[] pieces = credential.split(":");
+            if (pieces[0].equals(user)) {
+                // Account exists, return true if the password matches.
+                return pieces[1].equals(password);
+            }
+        }
+        return false;
     }
 }
 

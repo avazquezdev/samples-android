@@ -1,8 +1,9 @@
 package com.example.avazquezdev.loginscreen;
 
-/**
- * Created by Nero88 on 25/10/17.
- */
-
 public interface KeyStoreInterface {
+    public boolean createNewKey(String alias);
+    public void deleteKey(String alias);
+    public String encryptString(String alias, String password);
+    public String decryptString(String alias, String password);
+    public boolean existAlias(String alias);
 }
